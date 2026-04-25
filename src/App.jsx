@@ -3,13 +3,12 @@ import * as XLSX from "xlsx";
 import supabase from "./supabase";
 
 function App() {
-  /* LOGIN */
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
   const [logged, setLogged] = useState(false);
 
-  /* UI */
   const [page, setPage] = useState("dashboard");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   /* CLIENTES */
   const [clients, setClients] = useState([]);
@@ -96,7 +95,6 @@ function App() {
     setAddress("");
     setManager("");
     setPhone("");
-
     loadClients();
   }
 
@@ -145,7 +143,9 @@ function App() {
 
     reader.onload = (evt) => {
       const data = evt.target.result;
-      const workbook = XLSX.read(data, { type: "binary" });
+      const workbook = XLSX.read(data, {
+        type: "binary",
+      });
 
       const sheet =
         workbook.Sheets[
@@ -178,30 +178,16 @@ function App() {
       cliente: clienteMapeo,
       funcionario:
         row["FUNCIONARIO"] || "",
-      cedula:
-        row["CEDULA"] || "",
       departamento:
         row["DEPARTAMENTO"] || "",
       equipo:
         row["EQUIPO"] || "",
-      marca:
-        row["MARCA"] || "",
-      modelo:
-        row["MODELO"] || "",
-      procesador:
-        row["PROCESADOR"] || "",
       ram:
         row["MEMORIA RAM"] || "",
-      disco:
-        row["CAPACIDAD DISCO"] || "",
       windows:
         row["WINDOWS"] || "",
       office:
         row["OFFICE"] || "",
-      antivirus:
-        row["ANTIVIRUS"] || "",
-      observacion:
-        row["OBSERVACIONES"] || "",
       extras: row,
     }));
 
@@ -211,17 +197,16 @@ function App() {
 
     if (error) return alert(error.message);
 
-    alert("Mapeo importado");
-
+    alert("Importado");
     setExcelRows([]);
     loadMapeos();
   }
 
   if (!logged) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="bg-slate-900 p-8 rounded-2xl w-full max-w-md">
-          <h1 className="text-4xl font-bold text-center mb-6 text-white">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-slate-900 p-6 rounded-2xl w-full max-w-md">
+          <h1 className="text-4xl font-bold text-center mb-6">
             Pendify 🚀
           </h1>
 
@@ -231,7 +216,7 @@ function App() {
             onChange={(e) =>
               setUser(e.target.value)
             }
-            className="w-full p-3 rounded-xl bg-slate-800 text-white mb-4"
+            className="w-full p-3 rounded-xl bg-slate-800 mb-4"
           />
 
           <input
@@ -241,7 +226,7 @@ function App() {
             onChange={(e) =>
               setPass(e.target.value)
             }
-            className="w-full p-3 rounded-xl bg-slate-800 text-white mb-4"
+            className="w-full p-3 rounded-xl bg-slate-800 mb-4"
           />
 
           <button
@@ -267,13 +252,30 @@ function App() {
     );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex">
-      {/* SIDEBAR */}
-      <div className="w-64 bg-slate-900 p-6">
-        <h1 className="text-3xl font-bold mb-8">
+    <div className="min-h-screen bg-slate-950 text-white md:flex">
+
+      {/* MOBILE TOPBAR */}
+      <div className="md:hidden bg-slate-900 p-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">
           Pendify 🚀
         </h1>
 
+        <button
+          onClick={() =>
+            setMenuOpen(!menuOpen)
+          }
+          className="text-2xl"
+        >
+          ☰
+        </button>
+      </div>
+
+      {/* SIDEBAR */}
+      <div
+        className={`bg-slate-900 w-full md:w-64 p-6 ${
+          menuOpen ? "block" : "hidden"
+        } md:block`}
+      >
         <Menu text="📊 Dashboard" page={page} current="dashboard" setPage={setPage}/>
         <Menu text="🏢 Clientes" page={page} current="clientes" setPage={setPage}/>
         <Menu text="🎫 Tickets" page={page} current="tickets" setPage={setPage}/>
@@ -281,13 +283,15 @@ function App() {
       </div>
 
       {/* MAIN */}
-      <div className="flex-1 p-8 overflow-auto">
+      <div className="flex-1 p-4 md:p-8 overflow-auto">
 
         {page === "dashboard" && (
           <>
-            <h2 className="text-4xl font-bold mb-6">Dashboard</h2>
+            <h2 className="text-3xl font-bold mb-6">
+              Dashboard
+            </h2>
 
-            <div className="grid md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card title="Clientes" value={clients.length}/>
               <Card title="Tickets" value={tickets.length}/>
               <Card title="Abiertos" value={abiertos}/>
@@ -298,16 +302,18 @@ function App() {
 
         {page === "clientes" && (
           <>
-            <h2 className="text-4xl font-bold mb-6">Clientes</h2>
+            <h2 className="text-3xl font-bold mb-6">
+              Clientes
+            </h2>
 
-            <div className="bg-slate-900 p-6 rounded-2xl grid md:grid-cols-2 gap-4 mb-6">
+            <div className="bg-slate-900 p-4 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <input placeholder="Nombre empresa" value={name} onChange={(e)=>setName(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
               <input placeholder="RUC" value={ruc} onChange={(e)=>setRuc(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
               <input placeholder="Dirección" value={address} onChange={(e)=>setAddress(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
               <input placeholder="Encargado" value={manager} onChange={(e)=>setManager(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
               <input placeholder="Número encargado" value={phone} onChange={(e)=>setPhone(e.target.value)} className="p-3 rounded-xl bg-slate-800 md:col-span-2"/>
 
-              <button onClick={addClient} className="bg-emerald-500 p-3 rounded-xl md:col-span-2 font-bold">
+              <button onClick={addClient} className="bg-emerald-500 p-3 rounded-xl font-bold md:col-span-2">
                 Guardar cliente
               </button>
             </div>
@@ -320,7 +326,7 @@ function App() {
                   `RUC: ${c.Ruc}`,
                   `📍 ${c.adress}`,
                   `👤 ${c.managername}`,
-                  `📞 ${c.managerphone}`
+                  `📞 ${c.managerphone}`,
                 ]}
               />
             ))}
@@ -329,16 +335,18 @@ function App() {
 
         {page === "tickets" && (
           <>
-            <h2 className="text-4xl font-bold mb-6">Tickets</h2>
+            <h2 className="text-3xl font-bold mb-6">
+              Tickets
+            </h2>
 
-            <div className="bg-slate-900 p-6 rounded-2xl grid gap-4 mb-6">
+            <div className="bg-slate-900 p-4 rounded-2xl grid gap-4 mb-6">
               <select value={client} onChange={(e)=>setClient(e.target.value)} className="p-3 rounded-xl bg-slate-800">
                 {clients.map((c)=>(
                   <option key={c.id}>{c.Name}</option>
                 ))}
               </select>
 
-              <input placeholder="Problema reportado" value={issue} onChange={(e)=>setIssue(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
+              <input placeholder="Problema" value={issue} onChange={(e)=>setIssue(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
 
               <select value={priority} onChange={(e)=>setPriority(e.target.value)} className="p-3 rounded-xl bg-slate-800">
                 <option>Alta</option>
@@ -358,28 +366,42 @@ function App() {
             </div>
 
             {tickets.map((t)=>(
-              <div key={t.id} className="bg-slate-900 p-5 rounded-2xl mb-4">
-                <h3 className="text-xl font-bold">{t.client}</h3>
-                <p>🎫 {t.issue}</p>
-                <p>⚡ {t.priority}</p>
-                <p>👨‍🔧 {t.tech}</p>
-                <p>📌 {t.status}</p>
-
-                <button onClick={()=>changeStatus(t.id,t.status)} className="mt-3 bg-emerald-500 px-4 py-2 rounded-xl">
-                  Cambiar estado
-                </button>
-              </div>
+              <Box
+                key={t.id}
+                title={t.client}
+                lines={[
+                  `🎫 ${t.issue}`,
+                  `⚡ ${t.priority}`,
+                  `👨‍🔧 ${t.tech}`,
+                  `📌 ${t.status}`,
+                ]}
+                button={
+                  <button
+                    onClick={() =>
+                      changeStatus(
+                        t.id,
+                        t.status
+                      )
+                    }
+                    className="mt-3 bg-emerald-500 px-4 py-2 rounded-xl"
+                  >
+                    Cambiar estado
+                  </button>
+                }
+              />
             ))}
           </>
         )}
 
         {page === "mapeos" && (
           <>
-            <h2 className="text-4xl font-bold mb-6">Mapeos</h2>
+            <h2 className="text-3xl font-bold mb-6">
+              Mapeos
+            </h2>
 
-            <div className="bg-slate-900 p-6 rounded-2xl grid gap-4 mb-6">
+            <div className="bg-slate-900 p-4 rounded-2xl grid gap-4 mb-6">
               <input
-                placeholder="Cliente (Ej: ELADIA)"
+                placeholder="Cliente"
                 value={clienteMapeo}
                 onChange={(e)=>setClienteMapeo(e.target.value)}
                 className="p-3 rounded-xl bg-slate-800"
@@ -396,7 +418,7 @@ function App() {
               </p>
             </div>
 
-            <div className="bg-slate-900 p-6 rounded-2xl mb-6">
+            <div className="bg-slate-900 p-4 rounded-2xl mb-6">
               <input
                 placeholder="Buscar usuario..."
                 value={search}
@@ -411,11 +433,11 @@ function App() {
                 title={m.funcionario}
                 lines={[
                   `Cliente: ${m.cliente}`,
-                  `Departamento: ${m.departamento}`,
+                  `Depto: ${m.departamento}`,
                   `Equipo: ${m.equipo}`,
                   `RAM: ${m.ram}`,
                   `Windows: ${m.windows}`,
-                  `Office: ${m.office}`
+                  `Office: ${m.office}`,
                 ]}
               />
             ))}
@@ -427,7 +449,12 @@ function App() {
   );
 }
 
-function Menu({ text, page, current, setPage }) {
+function Menu({
+  text,
+  page,
+  current,
+  setPage,
+}) {
   return (
     <div
       onClick={() => setPage(current)}
@@ -446,18 +473,31 @@ function Card({ title, value }) {
   return (
     <div className="bg-slate-900 p-5 rounded-2xl">
       <p className="text-slate-400">{title}</p>
-      <h2 className="text-3xl font-bold">{value}</h2>
+      <h2 className="text-3xl font-bold">
+        {value}
+      </h2>
     </div>
   );
 }
 
-function Box({ title, lines }) {
+function Box({
+  title,
+  lines,
+  button,
+}) {
   return (
     <div className="bg-slate-900 p-5 rounded-2xl mb-4">
-      <h3 className="text-xl font-bold mb-2">{title}</h3>
+      <h3 className="text-xl font-bold mb-2">
+        {title}
+      </h3>
+
       {lines.map((line, i)=>(
-        <p key={i} className="text-slate-400">{line}</p>
+        <p key={i} className="text-slate-400">
+          {line}
+        </p>
       ))}
+
+      {button}
     </div>
   );
 }
