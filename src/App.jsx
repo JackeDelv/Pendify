@@ -1,59 +1,78 @@
 import { useState, useEffect } from "react";
-import * as XLSX from "xlsx";
 import supabase from "./supabase";
 
 function App() {
-  const [user, setUser] = useState("");
-  const [pass, setPass] = useState("");
-  const [logged, setLogged] = useState(false);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const [page, setPage] = useState("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
 
-  /* CLIENTES */
   const [clients, setClients] = useState([]);
-  const [name, setName] = useState("");
-  const [ruc, setRuc] = useState("");
-  const [address, setAddress] = useState("");
-  const [manager, setManager] = useState("");
-  const [phone, setPhone] = useState("");
-
-  /* TICKETS */
   const [tickets, setTickets] = useState([]);
-  const [client, setClient] = useState("");
-  const [issue, setIssue] = useState("");
-  const [priority, setPriority] = useState("Media");
-  const [tech, setTech] = useState("Juan");
-
-  /* MAPEOS */
-  const [clienteMapeo, setClienteMapeo] = useState("");
-  const [excelRows, setExcelRows] = useState([]);
   const [mapeos, setMapeos] = useState([]);
-  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (logged) {
-      loadClients();
-      loadTickets();
-      loadMapeos();
+    init();
+  }, []);
+
+  async function init() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    setSession(session);
+
+    if (session) {
+      await loadProfile(session.user.id);
+      await loadAll();
     }
-  }, [logged]);
+
+    supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setSession(session);
+
+        if (session) {
+          await loadProfile(session.user.id);
+          await loadAll();
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+  }
+
+  async function loadProfile(id) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    setProfile(data);
+  }
+
+  async function loadAll() {
+    loadClients();
+    loadTickets();
+    loadMapeos();
+  }
 
   async function loadClients() {
     const { data } = await supabase
       .from("Clients")
-      .select("*")
-      .order("id", { ascending: true });
+      .select("*");
 
     setClients(data || []);
-    if (data?.length > 0) setClient(data[0].Name);
   }
 
   async function loadTickets() {
     const { data } = await supabase
       .from("Tickets")
-      .select("*")
-      .order("id", { ascending: false });
+      .select("*");
 
     setTickets(data || []);
   }
@@ -61,177 +80,56 @@ function App() {
   async function loadMapeos() {
     const { data } = await supabase
       .from("Mapeos")
-      .select("*")
-      .order("id", { ascending: false });
+      .select("*");
 
     setMapeos(data || []);
   }
 
-  function login() {
-    if (user === "admin" && pass === "1234") {
-      setLogged(true);
-    } else {
-      alert("Datos incorrectos");
-    }
-  }
-
-  async function addClient() {
-    const { error } = await supabase
-      .from("Clients")
-      .insert([
-        {
-          Name: name,
-          Ruc: ruc,
-          adress: address,
-          managername: manager,
-          managerphone: phone,
-        },
-      ]);
-
-    if (error) return alert(error.message);
-
-    setName("");
-    setRuc("");
-    setAddress("");
-    setManager("");
-    setPhone("");
-    loadClients();
-  }
-
-  async function addTicket() {
-    const { error } = await supabase
-      .from("Tickets")
-      .insert([
-        {
-          client,
-          issue,
-          priority,
-          tech,
-          status: "Abierto",
-        },
-      ]);
-
-    if (error) return alert(error.message);
-
-    setIssue("");
-    loadTickets();
-  }
-
-  async function changeStatus(id, status) {
-    const next =
-      status === "Abierto"
-        ? "En proceso"
-        : status === "En proceso"
-        ? "Resuelto"
-        : status === "Resuelto"
-        ? "Cerrado"
-        : "Abierto";
-
-    await supabase
-      .from("Tickets")
-      .update({ status: next })
-      .eq("id", id);
-
-    loadTickets();
-  }
-
-  function readExcel(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = (evt) => {
-      const data = evt.target.result;
-      const workbook = XLSX.read(data, {
-        type: "binary",
+  async function login() {
+    const { error } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const sheet =
-        workbook.Sheets[
-          workbook.SheetNames[0]
-        ];
-
-      const rows =
-        XLSX.utils.sheet_to_json(sheet);
-
-      const cleanRows = rows.filter(
-        (row) =>
-          row["FUNCIONARIO"] &&
-          row["FUNCIONARIO"] !== "CENTRAL"
-      );
-
-      setExcelRows(cleanRows);
-    };
-
-    reader.readAsBinaryString(file);
+    if (error) alert(error.message);
   }
 
-  async function importToCloud() {
-    if (!clienteMapeo.trim())
-      return alert("Ingrese cliente");
-
-    if (excelRows.length === 0)
-      return alert("Seleccione Excel");
-
-    const payload = excelRows.map((row) => ({
-      cliente: clienteMapeo,
-      funcionario:
-        row["FUNCIONARIO"] || "",
-      departamento:
-        row["DEPARTAMENTO"] || "",
-      equipo:
-        row["EQUIPO"] || "",
-      ram:
-        row["MEMORIA RAM"] || "",
-      windows:
-        row["WINDOWS"] || "",
-      office:
-        row["OFFICE"] || "",
-      extras: row,
-    }));
-
-    const { error } = await supabase
-      .from("Mapeos")
-      .insert(payload);
-
-    if (error) return alert(error.message);
-
-    alert("Importado");
-    setExcelRows([]);
-    loadMapeos();
+  async function logout() {
+    await supabase.auth.signOut();
   }
 
-  if (!logged) {
+  if (!session) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-slate-900 p-6 rounded-2xl w-full max-w-md">
-          <h1 className="text-4xl font-bold text-center mb-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center p-4">
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md">
+          <h1 className="text-5xl font-black text-center mb-6">
             Pendify 🚀
           </h1>
 
           <input
-            placeholder="Usuario"
-            value={user}
+            type="email"
+            placeholder="Correo"
+            value={email}
             onChange={(e) =>
-              setUser(e.target.value)
+              setEmail(e.target.value)
             }
-            className="w-full p-3 rounded-xl bg-slate-800 mb-4"
+            className="w-full p-3 rounded-2xl bg-slate-800 border border-slate-700 mb-4"
           />
 
           <input
             type="password"
             placeholder="Contraseña"
-            value={pass}
+            value={password}
             onChange={(e) =>
-              setPass(e.target.value)
+              setPassword(e.target.value)
             }
-            className="w-full p-3 rounded-xl bg-slate-800 mb-4"
+            className="w-full p-3 rounded-2xl bg-slate-800 border border-slate-700 mb-4"
           />
 
           <button
             onClick={login}
-            className="w-full bg-emerald-500 p-3 rounded-xl font-bold"
+            className="w-full bg-emerald-500 hover:bg-emerald-400 p-3 rounded-2xl font-bold"
           >
             Ingresar
           </button>
@@ -244,19 +142,12 @@ function App() {
     (t) => t.status === "Abierto"
   ).length;
 
-  const filteredMapeos =
-    mapeos.filter((m) =>
-      JSON.stringify(m)
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
-
   return (
-    <div className="min-h-screen bg-slate-950 text-white md:flex">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white md:flex">
 
-      {/* MOBILE TOPBAR */}
-      <div className="md:hidden bg-slate-900 p-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">
+      {/* MOBILE */}
+      <div className="md:hidden bg-slate-900/80 p-4 flex justify-between items-center border-b border-slate-800">
+        <h1 className="text-2xl font-black">
           Pendify 🚀
         </h1>
 
@@ -272,22 +163,42 @@ function App() {
 
       {/* SIDEBAR */}
       <div
-        className={`bg-slate-900 w-full md:w-64 p-6 ${
+        className={`bg-slate-900/80 backdrop-blur-xl border-r border-slate-800 w-full md:w-72 p-6 ${
           menuOpen ? "block" : "hidden"
         } md:block`}
       >
+        <h1 className="text-3xl font-black mb-6 hidden md:block">
+          Pendify 🚀
+        </h1>
+
+        <div className="bg-slate-800 p-4 rounded-2xl mb-6">
+          <p className="font-bold">
+            {profile?.name}
+          </p>
+          <p className="text-slate-400 text-sm">
+            {profile?.role}
+          </p>
+        </div>
+
         <Menu text="📊 Dashboard" page={page} current="dashboard" setPage={setPage}/>
         <Menu text="🏢 Clientes" page={page} current="clientes" setPage={setPage}/>
         <Menu text="🎫 Tickets" page={page} current="tickets" setPage={setPage}/>
         <Menu text="📁 Mapeos" page={page} current="mapeos" setPage={setPage}/>
+
+        <button
+          onClick={logout}
+          className="w-full mt-6 bg-red-500 hover:bg-red-400 p-3 rounded-2xl font-bold"
+        >
+          Salir
+        </button>
       </div>
 
       {/* MAIN */}
-      <div className="flex-1 p-4 md:p-8 overflow-auto">
+      <div className="flex-1 p-4 md:p-8">
 
         {page === "dashboard" && (
           <>
-            <h2 className="text-3xl font-bold mb-6">
+            <h2 className="text-4xl font-black mb-6">
               Dashboard
             </h2>
 
@@ -302,23 +213,8 @@ function App() {
 
         {page === "clientes" && (
           <>
-            <h2 className="text-3xl font-bold mb-6">
-              Clientes
-            </h2>
-
-            <div className="bg-slate-900 p-4 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <input placeholder="Nombre empresa" value={name} onChange={(e)=>setName(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
-              <input placeholder="RUC" value={ruc} onChange={(e)=>setRuc(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
-              <input placeholder="Dirección" value={address} onChange={(e)=>setAddress(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
-              <input placeholder="Encargado" value={manager} onChange={(e)=>setManager(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
-              <input placeholder="Número encargado" value={phone} onChange={(e)=>setPhone(e.target.value)} className="p-3 rounded-xl bg-slate-800 md:col-span-2"/>
-
-              <button onClick={addClient} className="bg-emerald-500 p-3 rounded-xl font-bold md:col-span-2">
-                Guardar cliente
-              </button>
-            </div>
-
-            {clients.map((c)=>(
+            <Title text="Clientes" />
+            {clients.map((c) => (
               <Box
                 key={c.id}
                 title={c.Name}
@@ -335,37 +231,8 @@ function App() {
 
         {page === "tickets" && (
           <>
-            <h2 className="text-3xl font-bold mb-6">
-              Tickets
-            </h2>
-
-            <div className="bg-slate-900 p-4 rounded-2xl grid gap-4 mb-6">
-              <select value={client} onChange={(e)=>setClient(e.target.value)} className="p-3 rounded-xl bg-slate-800">
-                {clients.map((c)=>(
-                  <option key={c.id}>{c.Name}</option>
-                ))}
-              </select>
-
-              <input placeholder="Problema" value={issue} onChange={(e)=>setIssue(e.target.value)} className="p-3 rounded-xl bg-slate-800"/>
-
-              <select value={priority} onChange={(e)=>setPriority(e.target.value)} className="p-3 rounded-xl bg-slate-800">
-                <option>Alta</option>
-                <option>Media</option>
-                <option>Baja</option>
-              </select>
-
-              <select value={tech} onChange={(e)=>setTech(e.target.value)} className="p-3 rounded-xl bg-slate-800">
-                <option>Juan</option>
-                <option>Luis</option>
-                <option>Carlos</option>
-              </select>
-
-              <button onClick={addTicket} className="bg-emerald-500 p-3 rounded-xl font-bold">
-                Crear ticket
-              </button>
-            </div>
-
-            {tickets.map((t)=>(
+            <Title text="Tickets" />
+            {tickets.map((t) => (
               <Box
                 key={t.id}
                 title={t.client}
@@ -375,19 +242,6 @@ function App() {
                   `👨‍🔧 ${t.tech}`,
                   `📌 ${t.status}`,
                 ]}
-                button={
-                  <button
-                    onClick={() =>
-                      changeStatus(
-                        t.id,
-                        t.status
-                      )
-                    }
-                    className="mt-3 bg-emerald-500 px-4 py-2 rounded-xl"
-                  >
-                    Cambiar estado
-                  </button>
-                }
               />
             ))}
           </>
@@ -395,39 +249,8 @@ function App() {
 
         {page === "mapeos" && (
           <>
-            <h2 className="text-3xl font-bold mb-6">
-              Mapeos
-            </h2>
-
-            <div className="bg-slate-900 p-4 rounded-2xl grid gap-4 mb-6">
-              <input
-                placeholder="Cliente"
-                value={clienteMapeo}
-                onChange={(e)=>setClienteMapeo(e.target.value)}
-                className="p-3 rounded-xl bg-slate-800"
-              />
-
-              <input type="file" accept=".xlsx,.xls" onChange={readExcel}/>
-
-              <button onClick={importToCloud} className="bg-emerald-500 p-3 rounded-xl font-bold">
-                Importar Excel Online
-              </button>
-
-              <p className="text-slate-400">
-                Filas detectadas: {excelRows.length}
-              </p>
-            </div>
-
-            <div className="bg-slate-900 p-4 rounded-2xl mb-6">
-              <input
-                placeholder="Buscar usuario..."
-                value={search}
-                onChange={(e)=>setSearch(e.target.value)}
-                className="w-full p-3 rounded-xl bg-slate-800"
-              />
-            </div>
-
-            {filteredMapeos.map((m)=>(
+            <Title text="Mapeos" />
+            {mapeos.map((m) => (
               <Box
                 key={m.id}
                 title={m.funcionario}
@@ -436,8 +259,6 @@ function App() {
                   `Depto: ${m.departamento}`,
                   `Equipo: ${m.equipo}`,
                   `RAM: ${m.ram}`,
-                  `Windows: ${m.windows}`,
-                  `Office: ${m.office}`,
                 ]}
               />
             ))}
@@ -458,10 +279,10 @@ function Menu({
   return (
     <div
       onClick={() => setPage(current)}
-      className={`p-3 rounded-xl cursor-pointer mb-3 ${
+      className={`p-3 rounded-2xl cursor-pointer mb-3 transition ${
         page === current
           ? "bg-emerald-500"
-          : "bg-slate-800"
+          : "bg-slate-800 hover:bg-slate-700"
       }`}
     >
       {text}
@@ -471,34 +292,34 @@ function Menu({
 
 function Card({ title, value }) {
   return (
-    <div className="bg-slate-900 p-5 rounded-2xl">
+    <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-3xl shadow-xl">
       <p className="text-slate-400">{title}</p>
-      <h2 className="text-3xl font-bold">
-        {value}
-      </h2>
+      <h2 className="text-3xl font-black">{value}</h2>
     </div>
   );
 }
 
-function Box({
-  title,
-  lines,
-  button,
-}) {
+function Box({ title, lines }) {
   return (
-    <div className="bg-slate-900 p-5 rounded-2xl mb-4">
+    <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-3xl mb-4 shadow-xl">
       <h3 className="text-xl font-bold mb-2">
         {title}
       </h3>
 
-      {lines.map((line, i)=>(
+      {lines.map((line, i) => (
         <p key={i} className="text-slate-400">
           {line}
         </p>
       ))}
-
-      {button}
     </div>
+  );
+}
+
+function Title({ text }) {
+  return (
+    <h2 className="text-4xl font-black mb-6">
+      {text}
+    </h2>
   );
 }
 
